@@ -1,0 +1,271 @@
+<div
+  class="min-h-dvh bg-slate-950 bg-[radial-gradient(60rem_40rem_at_50%_-10rem,theme(colors.indigo.500/15%),transparent)]"
+>
+  <main class="mx-auto flex w-full max-w-5xl flex-col gap-8 px-4 py-10 sm:px-6 lg:py-16">
+    <header class="flex flex-col gap-2">
+      <p class="text-sm font-medium tracking-widest text-indigo-400 uppercase">Antes del viaje</p>
+      <h1 class="text-3xl font-bold tracking-tight text-white sm:text-4xl">
+        Amigo invisible de camisetas
+      </h1>
+      <p class="max-w-2xl text-slate-400">
+        Apunta a tus amigos, pulsa el botón y cada uno recibirá por correo a quién le toca regalar.
+        Tú tampoco lo verás: el resultado nunca se muestra en pantalla.
+      </p>
+    </header>
+
+    @if (!emailJsReady) {
+      <div
+        class="rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-200"
+        role="alert"
+      >
+        Falta configurar EmailJS. Pega tu <code class="font-mono">serviceId</code>,
+        <code class="font-mono">templateId</code> y <code class="font-mono">publicKey</code> en
+        <code class="font-mono">src/app/config/emailjs.config.ts</code> para poder enviar los
+        correos.
+      </div>
+    }
+
+    <section class="grid gap-8 lg:grid-cols-[22rem_1fr] lg:items-start">
+      <form
+        [formGroup]="form"
+        (ngSubmit)="addParticipant()"
+        class="flex flex-col gap-4 rounded-2xl border border-slate-800 bg-slate-900/60 p-5 shadow-xl shadow-black/20 backdrop-blur"
+      >
+        <h2 class="text-lg font-semibold text-white">Añadir participante</h2>
+
+        <div class="flex flex-col gap-1.5">
+          <label for="name" class="text-sm font-medium text-slate-300">Nombre</label>
+          <input
+            id="name"
+            type="text"
+            formControlName="name"
+            autocomplete="off"
+            placeholder="Marta"
+            class="rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-slate-100 placeholder:text-slate-600 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/30 focus:outline-none"
+          />
+          @if (form.controls.name.touched && form.controls.name.invalid) {
+            <p class="text-xs text-rose-400">Escribe un nombre de al menos 2 letras.</p>
+          }
+        </div>
+
+        <div class="flex flex-col gap-1.5">
+          <label for="email" class="text-sm font-medium text-slate-300">Correo electrónico</label>
+          <input
+            id="email"
+            type="email"
+            formControlName="email"
+            autocomplete="off"
+            placeholder="marta@ejemplo.com"
+            class="rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-slate-100 placeholder:text-slate-600 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/30 focus:outline-none"
+          />
+          @if (form.controls.email.touched && form.controls.email.invalid) {
+            <p class="text-xs text-rose-400">Introduce un correo válido.</p>
+          } @else if (duplicateEmail()) {
+            <p class="text-xs text-rose-400">Ese correo ya está en la lista.</p>
+          }
+        </div>
+
+        <div class="flex flex-col gap-1.5">
+          <label for="size" class="text-sm font-medium text-slate-300">Talla de camiseta</label>
+          <select
+            id="size"
+            formControlName="size"
+            class="rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-slate-100 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/30 focus:outline-none"
+          >
+            @for (size of sizes; track size) {
+              <option [value]="size">{{ size }}</option>
+            }
+          </select>
+        </div>
+
+        <div class="flex flex-col gap-1.5">
+          <label for="comment" class="text-sm font-medium text-slate-300">
+            Comentario o preferencias
+          </label>
+          <textarea
+            id="comment"
+            formControlName="comment"
+            rows="3"
+            placeholder="Colores oscuros, nada de cuello redondo…"
+            class="resize-y rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-slate-100 placeholder:text-slate-600 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/30 focus:outline-none"
+          ></textarea>
+        </div>
+
+        <button
+          type="submit"
+          [disabled]="isSending()"
+          class="rounded-lg bg-indigo-600 px-4 py-2.5 font-semibold text-white transition hover:bg-indigo-500 focus:ring-2 focus:ring-indigo-400 focus:ring-offset-2 focus:ring-offset-slate-900 focus:outline-none disabled:cursor-not-allowed disabled:opacity-40"
+        >
+          Añadir a la lista
+        </button>
+      </form>
+
+      <div class="flex flex-col gap-4">
+        <div class="flex flex-wrap items-center justify-between gap-3">
+          <h2 class="text-lg font-semibold text-white">
+            Participantes
+            <span class="ml-1 text-slate-500">({{ store.count() }})</span>
+          </h2>
+          @if (store.count() > 0) {
+            <button
+              type="button"
+              (click)="clearAll()"
+              [disabled]="isSending()"
+              class="text-sm text-slate-400 underline-offset-4 transition hover:text-rose-400 hover:underline disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              Vaciar lista
+            </button>
+          }
+        </div>
+
+        <ul class="flex flex-col gap-2">
+          @for (participant of store.participants(); track participant.id) {
+            <li
+              class="flex items-start gap-3 rounded-xl border border-slate-800 bg-slate-900/60 px-4 py-3"
+            >
+              <span
+                class="mt-0.5 inline-flex h-8 w-11 shrink-0 items-center justify-center rounded-md bg-indigo-500/15 text-xs font-bold text-indigo-300"
+              >
+                {{ participant.size }}
+              </span>
+              <div class="min-w-0 flex-1">
+                <p class="truncate font-medium text-white">{{ participant.name }}</p>
+                <p class="truncate text-sm text-slate-400">{{ participant.email }}</p>
+                @if (participant.comment) {
+                  <p class="mt-1 text-sm text-slate-500 italic">“{{ participant.comment }}”</p>
+                }
+              </div>
+              <button
+                type="button"
+                (click)="removeParticipant(participant.id)"
+                [disabled]="isSending()"
+                [attr.aria-label]="'Eliminar a ' + participant.name"
+                class="shrink-0 rounded-md px-2 py-1 text-slate-500 transition hover:bg-rose-500/10 hover:text-rose-400 disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                ✕
+              </button>
+            </li>
+          } @empty {
+            <li
+              class="rounded-xl border border-dashed border-slate-800 px-4 py-10 text-center text-slate-500"
+            >
+              Todavía no hay nadie apuntado. Empieza por el formulario de la izquierda.
+            </li>
+          }
+        </ul>
+      </div>
+    </section>
+
+    <section
+      class="flex flex-col gap-4 rounded-2xl border border-slate-800 bg-slate-900/60 p-5 shadow-xl shadow-black/20"
+    >
+      @switch (status()) {
+        @case ('confirming') {
+          <div class="flex flex-col gap-3">
+            <p class="font-medium text-white">
+              Se enviarán {{ store.count() }} correos y el sorteo no se podrá deshacer. ¿Seguimos?
+            </p>
+            <div class="flex flex-wrap gap-3">
+              <button
+                type="button"
+                (click)="drawAndSend()"
+                class="rounded-lg bg-emerald-600 px-5 py-2.5 font-semibold text-white transition hover:bg-emerald-500"
+              >
+                Sí, sortear y enviar
+              </button>
+              <button
+                type="button"
+                (click)="cancelConfirmation()"
+                class="rounded-lg border border-slate-700 px-5 py-2.5 font-semibold text-slate-300 transition hover:bg-slate-800"
+              >
+                Cancelar
+              </button>
+            </div>
+          </div>
+        }
+
+        @case ('sending') {
+          <div class="flex flex-col gap-3">
+            <p class="font-medium text-white">
+              Enviando {{ currentIndex() }} de {{ progress()?.total ?? store.count() }} correos…
+            </p>
+            <div class="h-2 w-full overflow-hidden rounded-full bg-slate-800">
+              <div
+                class="h-full rounded-full bg-indigo-500 transition-[width] duration-300"
+                [style.width.%]="percent()"
+              ></div>
+            </div>
+            <p class="text-sm text-slate-500">
+              Hay una pausa entre correos para no superar el límite de envíos de EmailJS.
+            </p>
+          </div>
+        }
+
+        @case ('finished') {
+          @let result = progress();
+          @if (result && result.failed.length === 0) {
+            <div class="flex flex-col gap-1">
+              <p class="font-semibold text-emerald-400">
+                ¡Listo! Se han enviado los {{ result.total }} correos.
+              </p>
+              <p class="text-sm text-slate-400">
+                Nadie se regala a sí mismo y la cadena es un único ciclo. Tu sorpresa sigue intacta:
+                el resultado no se ha mostrado en ningún sitio.
+              </p>
+            </div>
+          } @else if (result) {
+            <div class="flex flex-col gap-2">
+              <p class="font-semibold text-amber-400">
+                Enviados {{ result.succeeded }} de {{ result.total }}. Fallaron
+                {{ result.failed.length }}.
+              </p>
+              <p class="text-sm text-slate-400">No llegó el correo de:</p>
+              <ul class="flex flex-wrap gap-2">
+                @for (name of result.failed; track name) {
+                  <li class="rounded-md bg-rose-500/10 px-2 py-1 text-sm text-rose-300">
+                    {{ name }}
+                  </li>
+                }
+              </ul>
+              <p class="text-sm text-slate-500">
+                Si repites el sorteo se generará una cadena nueva y quienes sí recibieron el correo
+                tendrán una asignación distinta.
+              </p>
+            </div>
+          }
+          <button
+            type="button"
+            (click)="reset()"
+            class="self-start rounded-lg border border-slate-700 px-5 py-2.5 font-semibold text-slate-300 transition hover:bg-slate-800"
+          >
+            Volver
+          </button>
+        }
+
+        @default {
+          <div class="flex flex-col gap-3">
+            <button
+              type="button"
+              (click)="askConfirmation()"
+              [disabled]="!canSubmitDraw()"
+              class="rounded-lg bg-emerald-600 px-5 py-3 text-lg font-semibold text-white transition hover:bg-emerald-500 focus:ring-2 focus:ring-emerald-400 focus:ring-offset-2 focus:ring-offset-slate-900 focus:outline-none disabled:cursor-not-allowed disabled:bg-slate-700 disabled:text-slate-400"
+            >
+              Realizar sorteo y enviar correos
+            </button>
+
+            @if (!store.canDraw()) {
+              <p class="text-sm text-slate-500">
+                Faltan {{ store.missingToDraw() }} participantes para llegar al mínimo de
+                {{ minParticipants }}.
+              </p>
+            }
+
+            @if (fatalError(); as error) {
+              <p class="text-sm text-rose-400" role="alert">{{ error }}</p>
+            }
+          </div>
+        }
+      }
+    </section>
+  </main>
+</div>
